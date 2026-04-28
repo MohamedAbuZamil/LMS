@@ -387,7 +387,7 @@ CREATE TYPE message_audience AS ENUM ('student', 'parent');
 - `(lesson_id, student_id)` — هل الطالب حضر الحصة؟
 - `(started_at)` — تقارير زمنية.
 
-**استعلامات نموذجية:** انظر `views.sql` → `v_video_view_counts`, `v_lesson_watch_progress`.
+**استعلامات نموذجية:** انظر `db/lms.sql` → الـ views: `v_video_view_counts`, `v_lesson_watch_progress`.
 
 ---
 
@@ -560,7 +560,7 @@ WHERE student_id = 10;
 
 ### 1) تعليق عام على السؤال (نموذج الإجابة) — يظهر لكل من حلّ الامتحان
 
-```@c:\zamil\lms\db\schema.sql:217-227
+```@c:\zamil\lms\db\lms.sql
 CREATE TABLE questions (
   ...
   type        question_type NOT NULL,
@@ -582,7 +582,7 @@ UPDATE questions SET explanation = 'الإجابة الصحيحة لأن... ' WH
 
 ### 2) تعليق شخصي للطالب على إجابته — يظهر لهذا الطالب فقط
 
-```@c:\zamil\lms\db\schema.sql:295-309
+```@c:\zamil\lms\db\lms.sql
 CREATE TABLE exam_answers (
   ...
   is_correct     BOOLEAN,            -- NULL = not graded yet (essay)
@@ -633,7 +633,7 @@ ORDER BY question_id;
 
 ---
 
-## VIEWS المهمّة (تفاصيلها في `db/views.sql`)
+## VIEWS المهمّة (تفاصيلها في قسم 13 من `db/lms.sql`)
 
 | View | الغرض |
 | --- | --- |

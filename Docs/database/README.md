@@ -10,9 +10,7 @@
 | `schema.md` | مرجع مُفصّل لكل جدول، أعمدته، علاقاته، فهارسه. |
 | `story.md` | قصة كاملة من البداية للنهاية (سيناريوهات SQL لكل مرحلة). |
 | `erd.md` | مخطط علاقات الكيانات (ER Diagram) بـ Mermaid. |
-| `../../db/schema.sql` | الـ DDL الكامل (PostgreSQL). |
-| `../../db/views.sql` | الـ VIEWS المشتقّة (مثل `teacher_students`). |
-| `../../db/seed.sql` | بيانات ثابتة (المحافظات، الصفوف الدراسية). |
+| `../../db/lms.sql` | الملف الواحد الكامل: Schema + Views + Seed (PostgreSQL). |
 
 ## الـ Stack
 
@@ -71,16 +69,10 @@
 # 1) أنشئ قاعدة البيانات
 createdb lms_dev
 
-# 2) طبّق الـ schema
-psql -d lms_dev -f db/schema.sql
-
-# 3) طبّق الـ views
-psql -d lms_dev -f db/views.sql
-
-# 4) ابذر البيانات الثابتة
-psql -d lms_dev -f db/seed.sql
+# 2) طبّق الملف الواحد الكامل (Schema + Views + Seed)
+psql -d lms_dev -f db/lms.sql
 ```
 
 ## النسخ والترحيل (Migrations)
 
-حالياً نحتفظ بـ `schema.sql` كمصدر موثوق. بعد ربط Prisma سننتقل إلى migrations مُرقّمة في `prisma/migrations/`.
+حالياً نحتفظ بـ `lms.sql` كملف واحد للمصدر الموثوق. بعد ربط Prisma سننتقل إلى migrations مُرقّمة في `prisma/migrations/`.

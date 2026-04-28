@@ -9,7 +9,7 @@ lms/
 ├─ Student_Frontend/   ← واجهة الطالب  (Next.js, port 3000)
 ├─ Teacher_Frontend/   ← واجهة المدرس والسكرتارية (Next.js, port 3002)
 ├─ Admin_Frontend/     ← واجهة الأدمن  (Next.js, port 3001)
-├─ db/                 ← schema.sql + views.sql + seed.sql (PostgreSQL)
+├─ db/                 ← lms.sql (PostgreSQL — Schema + Views + Seed)
 └─ docs/database/      ← README.md + schema.md + story.md + erd.md
 ```
 
@@ -27,9 +27,7 @@ cd Admin_Frontend   ; npm install ; npm run dev   # http://localhost:3001
 
 ```powershell
 createdb lms_dev
-psql -d lms_dev -f db/schema.sql
-psql -d lms_dev -f db/views.sql
-psql -d lms_dev -f db/seed.sql
+psql -d lms_dev -f db/lms.sql
 ```
 
 ## التوثيق

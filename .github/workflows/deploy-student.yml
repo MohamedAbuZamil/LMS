@@ -1,0 +1,63 @@
+name: Deploy Student_Frontend to Azure Web App (lmszamil)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Student_Frontend/**'
+      - '.github/workflows/deploy-student.yml'
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: lmszamil
+  NODE_VERSION: '20.x'
+  WORKING_DIR: Student_Frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Build Next.js
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm run build
+
+      - name: Prepare deployment package
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          zip -r ../release.zip \
+            .next \
+            public \
+            node_modules \
+            package.json \
+            package-lock.json \
+            next.config.mjs \
+            -x "node_modules/.cache/*" || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-frontend
+          path: release.zip
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_LMSZAMIL }}
+          package: release.zip
