@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import prismaPlugin from "./plugins/prisma";
+import authPlugin from "./plugins/auth";
+import authRoutes from "./routes/auth";
 import { env, isProd } from "./config/env";
 
 async function buildServer() {
@@ -20,6 +23,14 @@ async function buildServer() {
   });
 
   await app.register(prismaPlugin);
+  await app.register(authPlugin);
+
+  // Global baseline rate limit. Per-route stricter limits are applied below.
+  await app.register(rateLimit, {
+    global: false, // disabled globally; opt in per route
+    max: 100,
+    timeWindow: "1 minute",
+  });
 
   // Health check
   app.get("/health", async () => ({ status: "ok", uptime: process.uptime() }));
@@ -29,6 +40,9 @@ async function buildServer() {
     version: "0.1.0",
     docs: "/health",
   }));
+
+  // Auth routes (login/staff, login/student, refresh, logout, me)
+  await app.register(authRoutes, { prefix: "/api/auth" });
 
   return app;
 }

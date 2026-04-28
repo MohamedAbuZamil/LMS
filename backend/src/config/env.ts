@@ -13,8 +13,11 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   corsOrigins: (process.env.CORS_ORIGINS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s: string) => s.trim())
     .filter(Boolean),
+  jwtSecret: required("JWT_SECRET"),
+  accessTokenTtl: process.env.ACCESS_TOKEN_TTL ?? "15m",
+  refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30),
 } as const;
 
 export const isProd = env.nodeEnv === "production";
