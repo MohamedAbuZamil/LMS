@@ -1,3 +1,4 @@
+"use client";
 import { ShieldCheck } from "lucide-react";
 import { ComingSoon } from "@/components/admin/ComingSoon";
 import { PageHeader } from "@/components/admin/PageHeader";
