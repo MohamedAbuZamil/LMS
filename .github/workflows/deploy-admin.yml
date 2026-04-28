@@ -1,0 +1,19 @@
+name: Deploy · Admin_Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Admin_Frontend/**'
+      - '.github/workflows/deploy-admin.yml'
+      - '.github/workflows/_deploy-nextjs.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-nextjs.yml
+    with:
+      app_dir: Admin_Frontend
+      azure_webapp_name: lmszamil-admin
+    secrets:
+      azure_publish_profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_LMSZAMIL_ADMIN }}

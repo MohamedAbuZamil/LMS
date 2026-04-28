@@ -1,0 +1,122 @@
+name: _Reusable Next.js Deploy to Azure
+
+# Reusable workflow: builds a Next.js app (standalone output) and deploys to an
+# Azure Web App using ZipDeploy. ZipDeploy replaces /home/site/wwwroot entirely,
+# so any files removed from the source code are automatically removed from the
+# server on the next deploy.
+
+on:
+  workflow_call:
+    inputs:
+      app_dir:
+        description: 'Source folder of the Next.js app (e.g. Student_Frontend)'
+        required: true
+        type: string
+      azure_webapp_name:
+        description: 'Name of the target Azure Web App'
+        required: true
+        type: string
+      node_version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20.x'
+    secrets:
+      azure_publish_profile:
+        description: 'Publish profile XML downloaded from the Azure Web App'
+        required: true
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy ${{ inputs.app_dir }}
+    runs-on: ubuntu-latest
+
+    # Prevent two deploys racing for the same Web App
+    concurrency:
+      group: deploy-${{ inputs.azure_webapp_name }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ inputs.node_version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.app_dir }}/package-lock.json
+
+      - name: Install dependencies (clean)
+        working-directory: ${{ inputs.app_dir }}
+        run: npm ci --no-audit --no-fund
+
+      - name: Build (Next.js standalone)
+        working-directory: ${{ inputs.app_dir }}
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+
+      # Next.js standalone output layout:
+      #   .next/standalone/   ← server.js + minimal node_modules
+      #   .next/static/       ← must be copied into standalone/.next/static
+      #   public/             ← must be copied into standalone/public
+      - name: Assemble standalone bundle
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          set -euo pipefail
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+          if [ -d public ]; then
+            cp -R public .next/standalone/public
+          fi
+
+      - name: Create startup file (Azure entrypoint)
+        working-directory: ${{ inputs.app_dir }}/.next/standalone
+        run: |
+          # Azure runs `npm start` by default; map it to Next.js standalone server.
+          # Also accept the dynamic PORT Azure injects (defaults to 8080).
+          cat > package.json.tmp <<'EOF'
+          {
+            "name": "azure-runtime",
+            "private": true,
+            "scripts": {
+              "start": "node server.js"
+            }
+          }
+          EOF
+          # Merge: keep existing fields, override scripts.start
+          if [ -f package.json ]; then
+            node -e "
+              const fs=require('fs');
+              const a=JSON.parse(fs.readFileSync('package.json','utf8'));
+              const b=JSON.parse(fs.readFileSync('package.json.tmp','utf8'));
+              a.scripts = Object.assign({}, a.scripts, b.scripts);
+              fs.writeFileSync('package.json', JSON.stringify(a, null, 2));
+            "
+          else
+            mv package.json.tmp package.json
+          fi
+          rm -f package.json.tmp
+
+      - name: Zip release bundle
+        working-directory: ${{ inputs.app_dir }}/.next/standalone
+        run: zip -rq "${GITHUB_WORKSPACE}/release.zip" .
+
+      - name: Show release size
+        run: ls -lh release.zip
+
+      - name: Deploy to Azure Web App (clean ZipDeploy)
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.azure_webapp_name }}
+          publish-profile: ${{ secrets.azure_publish_profile }}
+          package: release.zip
+          # ZipDeploy replaces /site/wwwroot entirely → deleted files are removed.
+          clean: true
+          restart: true
+
+      - name: Deployment URL
+        run: |
+          echo "::notice title=Deployed::https://${{ inputs.azure_webapp_name }}.azurewebsites.net"

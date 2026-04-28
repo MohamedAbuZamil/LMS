@@ -617,27 +617,18 @@ function SidebarRow({
   const finished = v.viewsUsed >= v.maxViews;
   const started = v.viewsUsed > 0 && !finished;
 
-  const Wrapper = locked ? ("div" as const) : Link;
-  const wrapperProps = locked ? { className: "block" } : { href };
+  const wrapperClassName = `group flex items-center gap-2 p-2 rounded-xl border transition ${
+    active
+      ? "bg-brand-50 border-brand-200 ring-1 ring-brand-200"
+      : locked
+      ? "bg-slate-50/50 border-transparent cursor-not-allowed opacity-80"
+      : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-100"
+  }`;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 10 }}
-      animate={{ opacity: 1, x: 0, transition: { delay: 0.05 * index } }}
-    >
-      <Wrapper
-        {...(wrapperProps as Record<string, unknown>)}
-        aria-disabled={locked || undefined}
-        className={`group flex items-center gap-2 p-2 rounded-xl border transition ${
-          active
-            ? "bg-brand-50 border-brand-200 ring-1 ring-brand-200"
-            : locked
-            ? "bg-slate-50/50 border-transparent cursor-not-allowed opacity-80"
-            : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-100"
-        }`}
-      >
-        {/* status icon */}
-        <span className="w-6 h-6 grid place-items-center shrink-0">
+  const inner = (
+    <>
+      {/* status icon */}
+      <span className="w-6 h-6 grid place-items-center shrink-0">
           {finished ? (
             <span className="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center">
               <CheckCircle2 size={14} />
@@ -682,7 +673,23 @@ function SidebarRow({
             )}
           </span>
         </div>
-      </Wrapper>
+    </>
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 10 }}
+      animate={{ opacity: 1, x: 0, transition: { delay: 0.05 * index } }}
+    >
+      {locked ? (
+        <div className={wrapperClassName} aria-disabled>
+          {inner}
+        </div>
+      ) : (
+        <Link href={href} className={wrapperClassName}>
+          {inner}
+        </Link>
+      )}
     </motion.div>
   );
 }

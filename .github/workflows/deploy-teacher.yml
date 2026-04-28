@@ -1,0 +1,19 @@
+name: Deploy · Teacher_Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Teacher_Frontend/**'
+      - '.github/workflows/deploy-teacher.yml'
+      - '.github/workflows/_deploy-nextjs.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-nextjs.yml
+    with:
+      app_dir: Teacher_Frontend
+      azure_webapp_name: lmszamil-teacher
+    secrets:
+      azure_publish_profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_LMSZAMIL_TEACHER }}

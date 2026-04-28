@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -44,6 +44,14 @@ const STORAGE_OWNED = "lms.buy.owned";
 const STORAGE_BALANCE = "lms.buy.balance";
 
 export default function BuyCoursesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-ink-500">جارٍ التحميل...</div>}>
+      <BuyCoursesPageInner />
+    </Suspense>
+  );
+}
+
+function BuyCoursesPageInner() {
   /* ───────── Query params (?teacher=tX&course=cY) ───────── */
   const search = useSearchParams();
   const initialTeacher = useMemo(() => {
