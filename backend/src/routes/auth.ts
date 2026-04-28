@@ -1,3 +1,4 @@
+import net from "node:net";
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { verifyPassword } from "../lib/password";
@@ -31,10 +32,17 @@ const LOCKOUT_MINUTES = 30;
 
 /* ----------------------------- Helpers ----------------------------- */
 
-const clientMeta = (req: FastifyRequest) => ({
-  user_agent: req.headers["user-agent"]?.slice(0, 500) ?? null,
-  ip_address: req.ip ?? null,
-});
+const clientMeta = (req: FastifyRequest) => {
+  // req.ip behind a proxy can be a comma-separated list, an IPv4-in-IPv6 form,
+  // or include a port. Postgres `inet` rejects anything but a clean IP literal.
+  const raw = (req.ip ?? "").split(",")[0]?.trim() ?? "";
+  const stripped = raw.startsWith("::ffff:") ? raw.slice(7) : raw;
+  const ip = net.isIP(stripped) ? stripped : null;
+  return {
+    user_agent: req.headers["user-agent"]?.slice(0, 500) ?? null,
+    ip_address: ip,
+  };
+};
 
 const isLocked = (lockedUntil: Date | null): boolean =>
   Boolean(lockedUntil && lockedUntil.getTime() > Date.now());
