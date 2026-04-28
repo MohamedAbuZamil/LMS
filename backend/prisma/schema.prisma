@@ -1,0 +1,562 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model activity_logs {
+  id               BigInt    @id @default(autoincrement())
+  actor_user_id    BigInt?
+  actor_student_id BigInt?
+  action           String    @db.VarChar(80)
+  entity_type      String?   @db.VarChar(60)
+  entity_id        BigInt?
+  metadata         Json?
+  ip_address       String?   @db.Inet
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  students         students? @relation(fields: [actor_student_id], references: [id], onUpdate: NoAction)
+  users            users?    @relation(fields: [actor_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([actor_student_id, created_at(sort: Desc)], map: "idx_activity_actor_student")
+  @@index([actor_user_id, created_at(sort: Desc)], map: "idx_activity_actor_user")
+  @@index([entity_type, entity_id], map: "idx_activity_entity")
+}
+
+model attendance {
+  id         BigInt           @id @default(autoincrement())
+  lesson_id  BigInt
+  student_id BigInt
+  status     attendance_state
+  note       String?
+  marked_by  BigInt?
+  marked_at  DateTime         @default(now()) @db.Timestamptz(6)
+  lessons    lessons          @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?           @relation(fields: [marked_by], references: [id], onUpdate: NoAction)
+  students   students         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([lesson_id, student_id])
+  @@index([student_id], map: "idx_attendance_student")
+}
+
+model courses {
+  id               BigInt        @id @default(autoincrement())
+  teacher_id       BigInt
+  title            String        @db.VarChar(200)
+  description      String?
+  grade_id         Int?          @db.SmallInt
+  image_url        String?
+  price_total      Decimal       @default(0) @db.Decimal(10, 2)
+  price_per_lesson Decimal       @default(0) @db.Decimal(10, 2)
+  total_lessons    Int           @default(0)
+  start_date       DateTime?     @db.Date
+  is_published     Boolean       @default(false)
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @default(now()) @db.Timestamptz(6)
+  deleted_at       DateTime?     @db.Timestamptz(6)
+  grades           grades?       @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  users            users         @relation(fields: [teacher_id], references: [id], onUpdate: NoAction)
+  enrollments      enrollments[]
+  lessons          lessons[]
+  video_views      video_views[]
+
+  @@index([grade_id], map: "idx_courses_grade")
+  @@index([teacher_id, is_published], map: "idx_courses_teacher")
+}
+
+model enrollments {
+  id            BigInt     @id @default(autoincrement())
+  student_id    BigInt
+  course_id     BigInt
+  enrolled_at   DateTime   @default(now()) @db.Timestamptz(6)
+  unenrolled_at DateTime?  @db.Timestamptz(6)
+  is_active     Boolean    @default(true)
+  total_due     Decimal    @default(0) @db.Decimal(10, 2)
+  paid_total    Decimal    @default(0) @db.Decimal(10, 2)
+  created_by    BigInt?
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime   @default(now()) @db.Timestamptz(6)
+  courses       courses    @relation(fields: [course_id], references: [id], onUpdate: NoAction)
+  users         users?     @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  students      students   @relation(fields: [student_id], references: [id], onUpdate: NoAction)
+  payments      payments[]
+
+  @@unique([student_id, course_id])
+  @@index([course_id, is_active], map: "idx_enroll_course")
+  @@index([student_id, is_active], map: "idx_enroll_student")
+}
+
+model exam_answers {
+  id               BigInt            @id @default(autoincrement())
+  attempt_id       BigInt
+  question_id      BigInt
+  choice_id        BigInt?
+  answer_text      String?
+  is_correct       Boolean?
+  score_awarded    Decimal?          @db.Decimal(5, 2)
+  graded_by        BigInt?
+  graded_at        DateTime?         @db.Timestamptz(6)
+  feedback         String?
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  exam_attempts    exam_attempts     @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  question_choices question_choices? @relation(fields: [choice_id], references: [id], onUpdate: NoAction)
+  users            users?            @relation(fields: [graded_by], references: [id], onUpdate: NoAction)
+  questions        questions         @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+
+  @@index([attempt_id], map: "idx_answers_attempt")
+}
+
+model exam_attempts {
+  id           BigInt         @id @default(autoincrement())
+  exam_id      BigInt
+  student_id   BigInt
+  started_at   DateTime       @default(now()) @db.Timestamptz(6)
+  submitted_at DateTime?      @db.Timestamptz(6)
+  score        Decimal?       @db.Decimal(6, 2)
+  status       attempt_status @default(in_progress)
+  snapshot     Json?
+  created_at   DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime       @default(now()) @db.Timestamptz(6)
+  exam_answers exam_answers[]
+  exams        exams          @relation(fields: [exam_id], references: [id], onUpdate: NoAction)
+  students     students       @relation(fields: [student_id], references: [id], onUpdate: NoAction)
+
+  @@index([exam_id, student_id], map: "idx_attempts_exam_student")
+  @@index([student_id, status], map: "idx_attempts_student_status")
+}
+
+model exam_questions {
+  id             BigInt    @id @default(autoincrement())
+  exam_id        BigInt
+  question_id    BigInt
+  order_index    Int       @default(0)
+  score_override Decimal?  @db.Decimal(5, 2)
+  exams          exams     @relation(fields: [exam_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  questions      questions @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+
+  @@unique([exam_id, question_id])
+  @@index([exam_id], map: "idx_exam_questions_exam")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model exam_random_rules {
+  id             BigInt         @id @default(autoincrement())
+  exam_id        BigInt
+  bank_id        BigInt
+  count_value    Int            @db.SmallInt
+  question_type  question_type?
+  question_banks question_banks @relation(fields: [bank_id], references: [id], onUpdate: NoAction)
+  exams          exams          @relation(fields: [exam_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([exam_id, bank_id, question_type])
+  @@index([exam_id], map: "idx_exam_random_rules_exam")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model exams {
+  id                BigInt              @id @default(autoincrement())
+  lesson_id         BigInt
+  title             String              @db.VarChar(200)
+  description       String?
+  starts_at         DateTime            @db.Timestamptz(6)
+  ends_at           DateTime            @db.Timestamptz(6)
+  duration_min      Int                 @db.SmallInt
+  visibility        exam_visibility     @default(visible)
+  selection_mode    exam_select_mode    @default(manual)
+  total_score       Decimal             @default(0) @db.Decimal(6, 2)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  exam_attempts     exam_attempts[]
+  exam_questions    exam_questions[]
+  exam_random_rules exam_random_rules[]
+  lessons           lessons             @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages          messages[]
+
+  @@index([lesson_id], map: "idx_exams_lesson")
+}
+
+model files {
+  id         BigInt   @id @default(autoincrement())
+  lesson_id  BigInt
+  title      String   @db.VarChar(200)
+  url        String
+  size_bytes BigInt?
+  mime_type  String?  @db.VarChar(120)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  lessons    lessons  @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lesson_id], map: "idx_files_lesson")
+}
+
+model governorates {
+  id       Int        @id @default(autoincrement()) @db.SmallInt
+  name     String     @unique @db.VarChar(60)
+  name_en  String?    @db.VarChar(60)
+  students students[]
+}
+
+model grades {
+  id             Int              @id @default(autoincrement()) @db.SmallInt
+  name           String           @unique @db.VarChar(60)
+  order_index    Int              @default(0) @db.SmallInt
+  courses        courses[]
+  question_banks question_banks[]
+  students       students[]
+}
+
+model lessons {
+  id           BigInt        @id @default(autoincrement())
+  course_id    BigInt
+  title        String        @db.VarChar(200)
+  description  String?
+  order_index  Int           @default(0)
+  scheduled_at DateTime?     @db.Timestamptz(6)
+  is_published Boolean       @default(false)
+  created_at   DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime      @default(now()) @db.Timestamptz(6)
+  attendance   attendance[]
+  exams        exams[]
+  files        files[]
+  courses      courses       @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  video_views  video_views[]
+  videos       videos[]
+
+  @@index([course_id, order_index], map: "idx_lessons_course")
+}
+
+model messages {
+  id                   BigInt           @id @default(autoincrement())
+  sender_user_id       BigInt?
+  recipient_student_id BigInt
+  audience             message_audience
+  channel              message_channel  @default(in_app)
+  related_exam_id      BigInt?
+  subject              String?          @db.VarChar(200)
+  body                 String
+  sent_at              DateTime         @default(now()) @db.Timestamptz(6)
+  delivered_at         DateTime?        @db.Timestamptz(6)
+  read_at              DateTime?        @db.Timestamptz(6)
+  students             students         @relation(fields: [recipient_student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  exams                exams?           @relation(fields: [related_exam_id], references: [id], onUpdate: NoAction)
+  users                users?           @relation(fields: [sender_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([recipient_student_id, sent_at(sort: Desc)], map: "idx_messages_recipient")
+  @@index([sender_user_id, sent_at(sort: Desc)], map: "idx_messages_sender")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notifications {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt?
+  student_id BigInt?
+  type       String    @db.VarChar(60)
+  title      String    @db.VarChar(200)
+  body       String?
+  data       Json?
+  read_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  students   students? @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([student_id, read_at, created_at(sort: Desc)], map: "idx_notifications_student")
+  @@index([user_id, read_at, created_at(sort: Desc)], map: "idx_notifications_user")
+}
+
+model payments {
+  id            BigInt         @id @default(autoincrement())
+  enrollment_id BigInt
+  amount        Decimal        @db.Decimal(10, 2)
+  method        payment_method
+  reference     String?        @db.VarChar(120)
+  note          String?
+  recorded_by   BigInt?
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  enrollments   enrollments    @relation(fields: [enrollment_id], references: [id], onUpdate: NoAction)
+  users         users?         @relation(fields: [recorded_by], references: [id], onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_payments_created_at")
+  @@index([enrollment_id], map: "idx_payments_enrollment")
+}
+
+model question_banks {
+  id                BigInt              @id @default(autoincrement())
+  teacher_id        BigInt
+  title             String              @db.VarChar(200)
+  description       String?
+  grade_id          Int?                @db.SmallInt
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  deleted_at        DateTime?           @db.Timestamptz(6)
+  exam_random_rules exam_random_rules[]
+  grades            grades?             @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  users             users               @relation(fields: [teacher_id], references: [id], onUpdate: NoAction)
+  questions         questions[]
+
+  @@index([teacher_id], map: "idx_banks_teacher")
+}
+
+model question_choices {
+  id           BigInt         @id @default(autoincrement())
+  question_id  BigInt
+  text         String
+  is_correct   Boolean        @default(false)
+  order_index  Int            @default(0) @db.SmallInt
+  exam_answers exam_answers[]
+  questions    questions      @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([question_id], map: "idx_choices_question")
+}
+
+model questions {
+  id               BigInt             @id @default(autoincrement())
+  bank_id          BigInt
+  type             question_type
+  text             String
+  explanation      String?
+  score            Decimal            @default(1.00) @db.Decimal(5, 2)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  exam_answers     exam_answers[]
+  exam_questions   exam_questions[]
+  question_choices question_choices[]
+  question_banks   question_banks     @relation(fields: [bank_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bank_id, type], map: "idx_questions_bank_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model refresh_tokens {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt?
+  student_id BigInt?
+  token_hash String    @unique @db.VarChar(255)
+  expires_at DateTime  @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  user_agent String?
+  ip_address String?   @db.Inet
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  students   students? @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([student_id], map: "idx_refresh_student")
+  @@index([user_id], map: "idx_refresh_user")
+}
+
+model students {
+  id                  BigInt                @id @default(autoincrement())
+  code                String                @unique @db.VarChar(20)
+  password_hash       String                @db.VarChar(255)
+  name                String                @db.VarChar(120)
+  phone               String?               @db.VarChar(20)
+  parent_phone        String?               @db.VarChar(20)
+  grade_id            Int?                  @db.SmallInt
+  governorate_id      Int?                  @db.SmallInt
+  birth_date          DateTime?             @db.Date
+  avatar_url          String?
+  balance             Decimal               @default(0) @db.Decimal(12, 2)
+  is_active           Boolean               @default(true)
+  last_login_at       DateTime?             @db.Timestamptz(6)
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  deleted_at          DateTime?             @db.Timestamptz(6)
+  activity_logs       activity_logs[]
+  attendance          attendance[]
+  enrollments         enrollments[]
+  exam_attempts       exam_attempts[]
+  messages            messages[]
+  notifications       notifications[]
+  refresh_tokens      refresh_tokens[]
+  governorates        governorates?         @relation(fields: [governorate_id], references: [id], onUpdate: NoAction)
+  grades              grades?               @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  video_views         video_views[]
+  wallet_transactions wallet_transactions[]
+
+  @@index([governorate_id], map: "idx_students_governorate")
+  @@index([grade_id], map: "idx_students_grade")
+  @@index([name], map: "idx_students_name")
+}
+
+model user_permissions {
+  id                                       BigInt   @id @default(autoincrement())
+  user_id                                  BigInt
+  permission_key                           String   @db.VarChar(80)
+  granted_by                               BigInt?
+  granted_at                               DateTime @default(now()) @db.Timestamptz(6)
+  users_user_permissions_granted_byTousers users?   @relation("user_permissions_granted_byTousers", fields: [granted_by], references: [id], onUpdate: NoAction)
+  users_user_permissions_user_idTousers    users    @relation("user_permissions_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, permission_key])
+  @@index([user_id], map: "idx_user_permissions_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                                  BigInt                @id @default(autoincrement())
+  role                                                user_role
+  username                                            String                @unique @db.VarChar(60)
+  password_hash                                       String                @db.VarChar(255)
+  name                                                String                @db.VarChar(120)
+  email                                               String?               @unique @db.VarChar(160)
+  phone                                               String?               @db.VarChar(20)
+  avatar_url                                          String?
+  manager_teacher_id                                  BigInt?
+  is_active                                           Boolean               @default(true)
+  last_login_at                                       DateTime?             @db.Timestamptz(6)
+  created_at                                          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime              @default(now()) @db.Timestamptz(6)
+  deleted_at                                          DateTime?             @db.Timestamptz(6)
+  activity_logs                                       activity_logs[]
+  attendance                                          attendance[]
+  courses                                             courses[]
+  enrollments                                         enrollments[]
+  exam_answers                                        exam_answers[]
+  messages                                            messages[]
+  notifications                                       notifications[]
+  payments                                            payments[]
+  question_banks                                      question_banks[]
+  refresh_tokens                                      refresh_tokens[]
+  user_permissions_user_permissions_granted_byTousers user_permissions[]    @relation("user_permissions_granted_byTousers")
+  user_permissions_user_permissions_user_idTousers    user_permissions[]    @relation("user_permissions_user_idTousers")
+  users                                               users?                @relation("usersTousers", fields: [manager_teacher_id], references: [id], onUpdate: NoAction)
+  other_users                                         users[]               @relation("usersTousers")
+  wallet_transactions                                 wallet_transactions[]
+
+  @@index([manager_teacher_id], map: "idx_users_manager")
+  @@index([role], map: "idx_users_role")
+}
+
+model video_views {
+  id              BigInt   @id @default(autoincrement())
+  student_id      BigInt
+  video_id        BigInt
+  lesson_id       BigInt
+  course_id       BigInt
+  started_at      DateTime @default(now()) @db.Timestamptz(6)
+  last_watched_at DateTime @default(now()) @db.Timestamptz(6)
+  watched_seconds Int      @default(0)
+  completed       Boolean  @default(false)
+  ip_address      String?  @db.Inet
+  user_agent      String?
+  courses         courses  @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lessons         lessons  @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students        students @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  videos          videos   @relation(fields: [video_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lesson_id, student_id], map: "idx_views_lesson_student")
+  @@index([started_at], map: "idx_views_started_at")
+  @@index([student_id, video_id], map: "idx_views_student_video")
+  @@index([video_id, student_id], map: "idx_views_video_student")
+}
+
+model videos {
+  id            BigInt        @id @default(autoincrement())
+  lesson_id     BigInt
+  title         String        @db.VarChar(200)
+  description   String?
+  server        video_server
+  url           String
+  thumbnail_url String?
+  duration_sec  Int?
+  max_views     Int?
+  order_index   Int           @default(0)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime      @default(now()) @db.Timestamptz(6)
+  video_views   video_views[]
+  lessons       lessons       @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lesson_id, order_index], map: "idx_videos_lesson")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model wallet_transactions {
+  id             BigInt          @id @default(autoincrement())
+  student_id     BigInt
+  type           wallet_tx_type
+  amount         Decimal         @db.Decimal(12, 2)
+  balance_after  Decimal         @db.Decimal(12, 2)
+  reference_type String?         @db.VarChar(40)
+  reference_id   BigInt?
+  method         payment_method?
+  reference      String?         @db.VarChar(120)
+  note           String?
+  performed_by   BigInt?
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  users          users?          @relation(fields: [performed_by], references: [id], onUpdate: NoAction)
+  students       students        @relation(fields: [student_id], references: [id], onUpdate: NoAction)
+
+  @@index([reference_type, reference_id], map: "idx_wallet_reference")
+  @@index([student_id, created_at(sort: Desc)], map: "idx_wallet_student")
+}
+
+enum attempt_status {
+  in_progress
+  submitted
+  under_review
+  graded
+}
+
+enum attendance_state {
+  present
+  absent
+  late
+}
+
+enum exam_select_mode {
+  manual
+  random
+}
+
+enum exam_visibility {
+  visible
+  hidden
+  visible_no_entry
+}
+
+enum message_audience {
+  student
+  parent
+}
+
+enum message_channel {
+  in_app
+  sms
+  whatsapp
+  email
+}
+
+enum payment_method {
+  cash
+  vodafone
+  instapay
+  fawry
+  wallet
+  other
+}
+
+enum question_type {
+  mcq
+  true_false
+  essay
+}
+
+enum user_role {
+  admin
+  teacher
+  secretary
+}
+
+enum video_server {
+  youtube
+  streamable
+  drive
+  lms
+}
+
+enum wallet_tx_type {
+  topup
+  purchase
+  refund
+  adjustment
+}

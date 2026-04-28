@@ -1,0 +1,33 @@
+{
+  "name": "lmszamil-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Unified LMS backend (Fastify + Prisma) serving Student, Teacher, and Admin frontends",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start": "node --env-file=.env dist/server.js",
+    "prisma:pull": "prisma db pull",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@prisma/client": "^5.22.0",
+    "fastify": "^4.28.1",
+    "fastify-plugin": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "pino-pretty": "^11.2.2",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
