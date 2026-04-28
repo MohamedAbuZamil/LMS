@@ -1,0 +1,60 @@
+name: Deploy · Backend API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  AZURE_WEBAPP_NAME: lmszamil-api
+  WORKING_DIR: backend
+
+jobs:
+  deploy:
+    name: Build & Deploy Backend API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Prune devDependencies
+        run: npm prune --omit=dev
+
+      - name: Stage deployment artifact
+        run: |
+          mkdir -p ../deploy
+          cp -r dist node_modules prisma package.json package-lock.json ../deploy/
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_LMSZAMIL_API }}
+          package: deploy
+
+      - name: Deployed
+        run: echo "Deployed https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health"
