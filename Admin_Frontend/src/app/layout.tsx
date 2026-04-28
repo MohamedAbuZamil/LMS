@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "لوحة تحكم منصة LMS",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={tajawal.variable}>
