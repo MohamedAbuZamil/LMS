@@ -4,6 +4,7 @@ import rateLimit from "@fastify/rate-limit";
 import prismaPlugin from "./plugins/prisma";
 import authPlugin from "./plugins/auth";
 import authRoutes from "./routes/auth";
+import referenceRoutes from "./routes/reference";
 import { env, isProd } from "./config/env";
 
 async function buildServer() {
@@ -43,6 +44,9 @@ async function buildServer() {
 
   // Auth routes (login/staff, login/student, refresh, logout, me)
   await app.register(authRoutes, { prefix: "/api/auth" });
+
+  // Reference / lookup data (governorates, grades, permissions)
+  await app.register(referenceRoutes, { prefix: "/api" });
 
   return app;
 }
